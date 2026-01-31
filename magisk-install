@@ -1,85 +1,112 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# UI Colors
-RED='\e[1;31m'
-GREEN='\e[1;32m'
-YELLOW='\e[1;33m'
-BLUE='\e[1;34m'
-NC='\e[0m' # No Color
+# UI Functions with your original color scheme
+ui_print() { echo -e "\e[1;34m[STATUS]\e[0m - $1"; }
+ui_success() { echo -e "\e[1;32m[SUCCESS]\e[0m - $1"; }
+ui_error() { echo -e "\e[1;31m[ERROR]\e[0m - $1"; }
+ui_warn() { echo -e "\e[1;33m[WARNING]\e[0m - $1"; }
 
-ui_print() { echo -e "${BLUE}[STATUS]${NC} $1"; }
-ui_warn() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-ui_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+echo "---------------------------------------------------------------"
+[span_1](start_span)ui_print "WARNING: This process voids your warranty."[span_1](end_span)
+[span_2](start_span)ui_print "The creator is NOT responsible for bricked devices."[span_2](end_span)
+[span_3](start_span)ui_print "Make sure your USB-OTG cable is stable."[span_3](end_span)
+echo "---------------------------------------------------------------"
 
-ui_print "---------------------------------------------"
-ui_print "- Open-Source Magisk Flash Tool             -"
-ui_print "---------------------------------------------"
+# --- NEW: OEM LOCKING WARNING ---
+ui_warn "BOOTLOADER LOCK INFO:"
+echo "1. Pixels and Global Xiaomis are usually unlockable."
+echo "2. Samsung (US/Verizon/AT&T) often have PERMANENTLY LOCKED bootloaders."
+echo "3. Huawei, Vivo, and Oppo are generally impossible to unlock."
+echo "---------------------------------------------------------------"
 
-# --- THE BIG WARNING ---
-ui_warn "IMPORTANT: BOOTLOADER LOCK INFO"
-echo "1. Most Pixels and Global Xiaomis are unlockable."
-echo "2. Samsung (US/Canada), Verizon, and AT&T models"
-echo "   often have PERMANENTLY LOCKED bootloaders."
-echo "3. Huawei and Vivo devices are generally locked tight."
-ui_warn "If your bootloader cannot be unlocked, STOP NOW."
-echo "---------------------------------------------"
+echo -n "- Do you accept these risks and have you verified your hardware? (yes/no): "
+read -r confirm
 
-ui_print "Starting ADB..."
-adb start-server >/dev/null 2>&1
+[span_4](start_span)if [[ "$confirm" != "yes" ]]; then[span_4](end_span)
+    ui_error "Process aborted by user."
+    exit 1
+fi
 
-# Check for Samsung specifically
+ui_print "Starting ADB Server..."
+[span_5](start_span)adb start-server >/dev/null 2>&1[span_5](end_span)
+
+# --- NEW: SAMSUNG DETECTION ---
+ui_print "Checking for Samsung devices..."
 MANUFACTURER=$(adb shell getprop ro.product.manufacturer 2>/dev/null | tr -d '\r')
 if [ "$MANUFACTURER" = "samsung" ] || [ "$MANUFACTURER" = "Samsung" ]; then
     ui_error "SAMSUNG DETECTED!"
-    echo "Samsung devices do not use Fastboot. They use Download Mode."
-    echo "This script is currently for Fastboot-based devices (Pixel, Xiaomi, etc)."
-    echo "For Samsung, you need to use 'Heimdall' or 'Odin'."
+    echo "Samsung devices use Download Mode (Odin/Heimdall), not Fastboot."
+    echo "This script is for Fastboot-based devices (Pixel, Xiaomi, etc)."
     exit 1
 fi
 
 ui_print "Checking for device..."
-if ! adb devices | grep -q -w "device"; then
-    ui_error "No device found. Check USB-OTG connection and USB Debugging."
+[span_6](start_span)if adb devices | grep -q -w "device"; then[span_6](end_span)
+    ui_success "Device detected."
+else
+    [span_7](start_span)ui_error "Device not found."[span_7](end_span)
     exit 1
 fi
 
-ui_print "Rebooting to Bootloader..."
+ui_print "Rebooting to bootloader..."
 adb reboot bootloader >/dev/null 2>&1
 
 ui_print "Waiting for Fastboot..."
-until fastboot devices | grep -q "fastboot"; do
+[span_8](start_span)until fastboot devices | grep -q "fastboot"; do[span_8](end_span)
     sleep 1
 done
+ui_success "Device is in Fastboot mode."
 
-ui_print "Attempting Bootloader Unlock (Standard)..."
-ui_warn "This will FAIL if 'OEM Unlocking' isn't on in Settings."
-fastboot flashing unlock || ui_error "Unlock failed! (Expected if already unlocked)"
+[span_9](start_span)ui_print "Attempting to unlock bootloader..."[span_9](end_span)
+ui_print "Check your phone screen to confirm the unlock!"
+[span_10](start_span)if fastboot flashing unlock; then[span_10](end_span)
+    ui_success "Unlock command sent successfully."
+else
+    ui_warn "Unlock failed. (This is normal if already unlocked or OEM Lock is on)."
+fi
 
-ui_print "Select the partition to flash the patched image:"
-echo "1) boot (Standard for most)"
-echo "2) init_boot (Newer Pixels/Android 13+)"
-echo "3) recovery (For some older devices)"
-read -r part_choice
+echo -n "- Enter path to vbmeta.img: "
+read -r vbmetapath
+vbmetapath=$(echo "$vbmetapath" | tr -d "'\"")
 
-case $part_choice in
+if [ -f "$vbmetapath" ]; then
+    ui_print "Flashing vbmeta (Disabling Verity)..."
+    fastboot flash vbmeta --disable-verity --disable-verification "$vbmetapath" >/dev/null 2>&1
+    ui_success "vbmeta flash successful!"
+else
+    ui_warn "No vbmeta provided or found. Skipping..."
+fi
+
+# --- UPDATED: PARTITION MENU ---
+ui_print "Select target partition:"
+echo "1) boot (Standard)"
+echo "2) init_boot (Modern Pixels/Android 13+)"
+echo "3) recovery (Legacy/Older devices)"
+read -r partition_choice
+
+case $partition_choice in
     1) target="boot" ;;
     2) target="init_boot" ;;
     3) target="recovery" ;;
     *) ui_error "Invalid choice"; exit 1 ;;
 esac
 
-ui_print "Drag and drop your patched image file here:"
-read -r img_path
-img_path=$(echo "$img_path" | tr -d "'\"")
+ui_print "Enter path to the patched $target image:"
+read -r patched_image_path
+[span_11](start_span)patched_image_path=$(echo "$patched_image_path" | tr -d "'\"")[span_11](end_span)
 
-if [ -f "$img_path" ]; then
-    ui_warn "Flashing $img_path to $target..."
-    ui_warn "Final chance to cancel (Ctrl+C)!"
-    sleep 3
-    fastboot flash "$target" "$img_path"
-    fastboot reboot
-    ui_print "Flash complete! Device is rebooting."
+[span_12](start_span)if [ -f "$patched_image_path" ]; then[span_12](end_span)
+    ui_print "Flashing $target image..."
+    [span_13](start_span)if fastboot flash "$target" "$patched_image_path" >/dev/null 2>&1; then[span_13](end_span)
+        [span_14](start_span)ui_success "$target flashed successfully!"[span_14](end_span)
+    else
+        [span_15](start_span)ui_error "Flash failed. Check if partition exists."[span_15](end_span)
+    fi
 else
-    ui_error "File not found! Path: 
-$img_path"
+    [span_16](start_span)ui_error "Patched image not found at: $patched_image_path"[span_16](end_span)
 fi
+
+ui_success "Process finished."
+ui_print "Rebooting device to System..."
+fastboot reboo
+t >/dev/null 2>&1
