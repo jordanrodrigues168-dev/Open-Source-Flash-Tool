@@ -1,0 +1,111 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# UI Functions
+ui_print() { echo -e "\e[1;34m[STATUS]\e[0m $1"; }
+ui_success() { echo -e "\e[1;32m[SUCCESS]\e[0m $1"; }
+ui_error() { echo -e "\e[1;31m[ERROR]\e[0m $1"; }
+
+ui_print "---------------------------------------------"
+ui_print "- This file is for installing custom ROMs"
+ui_print "- Check magisk-install for the disclaimer"
+ui_print "---------------------------------------------"
+ui_print ""
+
+ui_print "- Starting ADB Server..."
+adb start-server >/dev/null 2>&1
+ui_print "- Checking for device..."
+
+if adb devices | grep -q -w "device"; then
+    ui_success "- Device detected."
+else
+    ui_error "- Device not found. check OTG cable."
+    exit 1
+fi
+
+ui_print "- Rebooting to bootloader..."
+adb reboot bootloader >/dev/null 2>&1
+
+ui_print "- Waiting for Fastboot..."
+until fastboot devices | grep -q "fastboot"; do
+    sleep 1
+done
+ui_success "- Device is in Fastboot mode."
+
+ui_print "- Remember to unlock the bootloader and patch vbmeta!"
+ui_print "- You can flash a custom recovery here or just do it here."
+ui_print "- Installing a custom recovery is better most of the times."
+ui_print "- Which way do you choose?"
+ui_print "- This might break your banking apps."
+ui_print "- For custom recovery you need to usually decrypt with a pin or format data."
+echo ""
+ui_print "Choose: 1 [Custom Recovery Sideload] or 2 [Direct Fastboot Flash]"
+read -r choice
+
+if [ "$choice" = "1" ]; then
+    # METHOD 1: RECOVERY SIDELOAD
+    ui_print "Enter path to your Custom Recovery image (.img):"
+    read -r recovery_path
+    recovery_path=$(echo "$recovery_path" | tr -d "'\"")
+
+    if [ -f "$recovery_path" ]; then
+        ui_print "Flashing recovery..."
+        fastboot flash recovery "$recovery_path"
+        ui_print "Rebooting into Recovery mode..."
+        ui_print "Once in recovery, select 'Apply Update from ADB' or 'Sideload'."
+        fastboot reboot recovery
+        
+        ui_print "Waiting for Sideload mode..."
+        until adb devices | grep -q -w "sideload"; do
+            sleep 1
+        done
+
+        ui_print "Enter path to the ROM .zip file:"
+        read -r rom_path
+        rom_path=$(echo "$rom_path" | tr -d "'\"")
+        
+        ui_print "Installing ROM via Sideload... Do not unplug!"
+        if adb sideload "$rom_path"; then
+            ui_success "ROM installed successfully!"
+        else
+            ui_error "Sideload failed."
+        fi
+    else
+        ui_error "Recovery file not found."
+    fi
+
+elif [ "$choice" = "2" ]; then
+    # METHOD 2: FASTBOOT FLASHING (Standard for many modern ROMs)
+    ui_print "Ensure you have unzipped the ROM and have the .img files ready."
+    ui_print "Enter the directory path containing the ROM images:"
+    read -r rom_dir
+    rom_dir=$(echo "$rom_dir" | tr -d "'\"")
+
+    if [ -d "$rom_dir" ]; then
+        cd "$rom_dir" || exit
+        ui_print "Flashing System, Product, and Boot..."
+        # Note: Some devices use 'fastboot flashall', others need manual steps
+        fastboot flash boot boot.img
+        fastboot flash system system.img
+        fastboot flash vendor vendor.img
+        fastboot flash product product.img
+        ui_success "Flash sequence completed."
+    else
+        ui_error "Directory not found."
+    fi
+
+else
+    ui_error "Invalid choice. Exiting."
+    exit 1
+fi
+
+ui_print "Final step: It is highly recommended to wipe data after a ROM flash."
+ui_print "Would you like to factory reset (format data)? (yes/no)"
+read -r wipe_confirm
+if [ "$wipe_confirm" = "yes" ]; then
+    fastboot -w
+    ui_success "Data wiped."
+fi
+
+ui_print "Rebooting to system..."
+fastboot reboot
+ui_success "Process Finished!"
