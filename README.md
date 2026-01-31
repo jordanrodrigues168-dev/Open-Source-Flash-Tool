@@ -5,6 +5,6 @@
 
 • Remember to install **Termux** and the **required** package android-tools** with **pkg install android-tools**
 
-• Not yet a fully fletched out flash tool - maybe later
+• Not yet a **fully fletched** out **flash tool** - maybe **later**
 
-• Check the script itself for your safety and if the device bricks
+• Check the **script itself** for your **safety** and if the **device bricks**
