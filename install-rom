@@ -108,4 +108,5 @@ fi
 
 ui_print "Rebooting to system..."
 fastboot reboot
-ui_success "Process Finished!"
+ui_success "Proc
+ess Finished!"
