@@ -7,9 +7,9 @@ ui_error() { echo -e "\e[1;31m[ERROR]\e[0m - $1"; }
 ui_warn() { echo -e "\e[1;33m[WARNING]\e[0m - $1"; }
 
 echo "---------------------------------------------------------------"
-[span_1](start_span)ui_print "WARNING: This process voids your warranty."[span_1](end_span)
-[span_2](start_span)ui_print "The creator is NOT responsible for bricked devices."[span_2](end_span)
-[span_3](start_span)ui_print "Make sure your USB-OTG cable is stable."[span_3](end_span)
+ui_print "WARNING: This process voids your warranty."
+ui_print "The creator is NOT responsible for bricked devices."
+ui_print "Make sure your USB-OTG cable is stable."
 echo "---------------------------------------------------------------"
 
 # --- NEW: OEM LOCKING WARNING ---
@@ -22,13 +22,13 @@ echo "---------------------------------------------------------------"
 echo -n "- Do you accept these risks and have you verified your hardware? (yes/no): "
 read -r confirm
 
-[span_4](start_span)if [[ "$confirm" != "yes" ]]; then[span_4](end_span)
+if [[ "$confirm" != "yes" ]]; then
     ui_error "Process aborted by user."
     exit 1
 fi
 
 ui_print "Starting ADB Server..."
-[span_5](start_span)adb start-server >/dev/null 2>&1[span_5](end_span)
+adb start-server >/dev/null 2>&1
 
 # --- NEW: SAMSUNG DETECTION ---
 ui_print "Checking for Samsung devices..."
@@ -41,10 +41,10 @@ if [ "$MANUFACTURER" = "samsung" ] || [ "$MANUFACTURER" = "Samsung" ]; then
 fi
 
 ui_print "Checking for device..."
-[span_6](start_span)if adb devices | grep -q -w "device"; then[span_6](end_span)
+if adb devices | grep -q -w "device"; then
     ui_success "Device detected."
 else
-    [span_7](start_span)ui_error "Device not found."[span_7](end_span)
+    ui_error "Device not found."
     exit 1
 fi
 
@@ -52,14 +52,14 @@ ui_print "Rebooting to bootloader..."
 adb reboot bootloader >/dev/null 2>&1
 
 ui_print "Waiting for Fastboot..."
-[span_8](start_span)until fastboot devices | grep -q "fastboot"; do[span_8](end_span)
+until fastboot devices | grep -q "fastboot"; do
     sleep 1
 done
 ui_success "Device is in Fastboot mode."
 
-[span_9](start_span)ui_print "Attempting to unlock bootloader..."[span_9](end_span)
+ui_print "Attempting to unlock bootloader..."
 ui_print "Check your phone screen to confirm the unlock!"
-[span_10](start_span)if fastboot flashing unlock; then[span_10](end_span)
+if fastboot flashing unlock; then
     ui_success "Unlock command sent successfully."
 else
     ui_warn "Unlock failed. (This is normal if already unlocked or OEM Lock is on)."
@@ -93,17 +93,17 @@ esac
 
 ui_print "Enter path to the patched $target image:"
 read -r patched_image_path
-[span_11](start_span)patched_image_path=$(echo "$patched_image_path" | tr -d "'\"")[span_11](end_span)
+patched_image_path=$(echo "$patched_image_path" | tr -d "'\"")
 
-[span_12](start_span)if [ -f "$patched_image_path" ]; then[span_12](end_span)
+if [ -f "$patched_image_path" ]; then
     ui_print "Flashing $target image..."
-    [span_13](start_span)if fastboot flash "$target" "$patched_image_path" >/dev/null 2>&1; then[span_13](end_span)
-        [span_14](start_span)ui_success "$target flashed successfully!"[span_14](end_span)
+    if fastboot flash "$target" "$patched_image_path" >/dev/null 2>&1; then
+        ui_success "$target flashed successfully!"
     else
-        [span_15](start_span)ui_error "Flash failed. Check if partition exists."[span_15](end_span)
+        ui_error "Flash failed. Check if partition exists."
     fi
 else
-    [span_16](start_span)ui_error "Patched image not found at: $patched_image_path"[span_16](end_span)
+    ui_error "Patched image not found at: $patched_image_path"
 fi
 
 ui_success "Process finished."
